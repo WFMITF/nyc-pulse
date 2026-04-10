@@ -12,7 +12,7 @@ const brushedZips = ref([])
 
 onMounted(async () => {
   try {
-    const data = await d3.json('/nyc_master_data.json')
+    const data = await d3.json(`${import.meta.env.BASE_URL}nyc_master_data.json`)
     masterData.value = data
   } catch (error) {
     console.error('数据加载失败，请检查文件路径:', error)
