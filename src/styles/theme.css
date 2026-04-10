@@ -486,3 +486,34 @@ body {
 .chart-card-inline.chart-card-floating {
   overflow: visible;
 }
+
+.doc-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 24px;
+  margin-top: 10px;
+  min-height: 48px;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+  color: #3f3833;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  box-shadow: 0 12px 28px rgba(100, 86, 76, 0.1);
+  backdrop-filter: blur(16px);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.doc-link-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 16px 30px rgba(100, 86, 76, 0.14);
+}
+
+.doc-link-button:active {
+  transform: translateY(0);
+}

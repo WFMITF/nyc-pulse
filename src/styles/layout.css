@@ -360,6 +360,27 @@ textarea {
   max-width: 1480px;
 }
 
+.topbar-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-right: 18px;
+}
+
+.topbar-title-shell {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 920px) {
+  .topbar-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-right: 0;
+  }
+}
+
 .topbar-panels {
   padding: 8px 4px 10px;
 }
