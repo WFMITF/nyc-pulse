@@ -205,6 +205,223 @@ const brushedLabel = computed(() => {
     ? `${brushedZips.value.length} ZIPs selected`
     : 'No active selection'
 })
+
+const activeMapFeatures = computed(() => {
+  const features = masterData.value?.mapData?.features ?? []
+
+  if (!brushedZips.value.length) return features
+
+  const brushedSet = new Set(brushedZips.value.map((zip) => String(zip)))
+  return features.filter((feature) =>
+    brushedSet.has(String(feature?.properties?.primary_zip ?? ''))
+  )
+})
+
+function getSelectedMonthlySalary() {
+  const monthly = Number(currentIndustryInfo.value?.monthly_salary)
+  return Number.isFinite(monthly) && monthly > 0 ? monthly : null
+}
+
+function getFeatureAffordabilityRatio(feature) {
+  const rent = Number(feature?.properties?.rent)
+  const monthlySalary = getSelectedMonthlySalary()
+
+  if (!Number.isFinite(rent) || rent <= 0 || !monthlySalary) return null
+  return rent / monthlySalary
+}
+
+function getFeatureOpportunityCount(feature) {
+  const industries = feature?.properties?.industries || {}
+
+  if (selectedIndustry.value === '__all__') {
+    return Object.values(industries).reduce((sum, rawCount) => {
+      return sum + (Number(rawCount) || 0)
+    }, 0)
+  }
+
+  return Number(industries[selectedIndustry.value]) || 0
+}
+
+function getCurrentAnnualSalary() {
+  if (selectedIndustry.value !== '__all__') {
+    const annual = Number(currentIndustryInfo.value?.annual_salary)
+    return Number.isFinite(annual) && annual > 0 ? annual : null
+  }
+
+  const features = activeMapFeatures.value
+  let totalCount = 0
+  let totalWeightedAnnual = 0
+
+  for (const feature of features) {
+    const industries = feature?.properties?.industries ?? {}
+
+    for (const [code, rawCount] of Object.entries(industries)) {
+      const count = Number(rawCount) || 0
+      const annual = Number(salaryLookup.value[code]?.annual_salary ?? 0)
+
+      if (count > 0 && annual > 0) {
+        totalCount += count
+        totalWeightedAnnual += count * annual
+      }
+    }
+  }
+
+  if (!totalCount || !Number.isFinite(totalWeightedAnnual)) return null
+  return totalWeightedAnnual / totalCount
+}
+
+function classifyPressure(avgRatio) {
+  if (!Number.isFinite(avgRatio)) {
+    return {
+      tone: '灰色或中性色为主',
+      level: '暂时难以稳定判断'
+    }
+  }
+
+  if (avgRatio >= 0.72) {
+    return {
+      tone: '整体偏暖',
+      level: '较高'
+    }
+  }
+
+  if (avgRatio <= 0.48) {
+    return {
+      tone: '整体偏冷',
+      level: '较低'
+    }
+  }
+
+  return {
+    tone: '冷暖较均衡',
+    level: '中等'
+  }
+}
+
+function classifyOpportunityDensity(coverage) {
+  if (!Number.isFinite(coverage) || coverage <= 0) {
+    return {
+      density: '较稀疏',
+      level: '较少'
+    }
+  }
+
+  if (coverage >= 0.62) {
+    return {
+      density: '较密集',
+      level: '较多'
+    }
+  }
+
+  if (coverage <= 0.32) {
+    return {
+      density: '较稀疏',
+      level: '较少'
+    }
+  }
+
+  return {
+    density: '适中',
+    level: '适中'
+  }
+}
+
+function classifySalaryLevel(annualSalary) {
+  const salarySamples = availableIndustries.value
+    .filter((item) => String(item?.naics_code) !== '__all__')
+    .map((item) => Number(item?.annual_salary))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort(d3.ascending)
+
+  if (!Number.isFinite(annualSalary) || annualSalary <= 0 || !salarySamples.length) {
+    return {
+      size: '中等',
+      level: '中等'
+    }
+  }
+
+  const p33 = d3.quantile(salarySamples, 0.33) ?? salarySamples[0]
+  const p66 = d3.quantile(salarySamples, 0.66) ?? salarySamples[salarySamples.length - 1]
+
+  if (annualSalary >= p66) {
+    return {
+      size: '偏大',
+      level: '较高'
+    }
+  }
+
+  if (annualSalary <= p33) {
+    return {
+      size: '偏小',
+      level: '较低'
+    }
+  }
+
+  return {
+    size: '中等',
+    level: '中等'
+  }
+}
+
+const scatterInsight = computed(() => {
+  const features = activeMapFeatures.value
+  const industryName =
+    selectedIndustry.value === '__all__'
+      ? '全行业视图'
+      : (currentIndustryInfo.value?.title || '当前行业')
+
+  const scopePrefix = brushedZips.value.length ? '当前选中区域内，' : ''
+  const ratios = features
+    .map(getFeatureAffordabilityRatio)
+    .filter((value) => Number.isFinite(value))
+
+  const opportunityCounts = features
+    .map(getFeatureOpportunityCount)
+    .filter((value) => Number.isFinite(value))
+
+  const activeOpportunityCount = opportunityCounts.filter((value) => value > 0)
+  const avgRatio = ratios.length ? d3.mean(ratios) : NaN
+  const pressureInfo = classifyPressure(avgRatio)
+
+  const bubbleCoverage = features.length ? activeOpportunityCount.length / features.length : 0
+  const opportunityInfo = classifyOpportunityDensity(bubbleCoverage)
+
+  const annualSalary = getCurrentAnnualSalary()
+  const salaryInfo = classifySalaryLevel(annualSalary)
+  const salaryLabel = selectedIndustry.value === '__all__' ? '综合薪资水平' : '薪资水平'
+
+  const paragraphs = []
+
+  if (Number.isFinite(avgRatio)) {
+    paragraphs.push(
+      `${scopePrefix}${industryName}中，地图着色${pressureInfo.tone}，反映出当前范围内的住房压力总体${pressureInfo.level}。`
+    )
+  } else {
+    paragraphs.push(
+      `${scopePrefix}${industryName}中，地图中可用于判断住房压力的有效数据较少，当前范围内暂时难以形成稳定结论。`
+    )
+  }
+
+  if (activeOpportunityCount.length) {
+    paragraphs.push(
+      `地图上气泡分布${opportunityInfo.density}，说明该行业在当前范围内的就业机会总体${opportunityInfo.level}；气泡整体${salaryInfo.size}，反映出${salaryLabel}总体${salaryInfo.level}。`
+    )
+  } else {
+    paragraphs.push(
+      `当前范围内可见气泡较少，说明可观察到的就业机会总体较少；结合当前行业表现，${salaryLabel}总体${salaryInfo.level}。`
+    )
+  }
+
+  if (brushedZips.value.length && features.length <= 6) {
+    paragraphs.push('当前选中范围较小，这一结果更适合用于局部比较。')
+  }
+
+  return {
+    kicker: 'Current Snapshot',
+    title: brushedZips.value.length ? '局部区域摘要' : '全局视图摘要',
+    paragraphs
+  }
+})
 </script>
 
 <template>
@@ -316,18 +533,31 @@ const brushedLabel = computed(() => {
         />
 
         <div class="map-scatter-overlay">
-          <div class="chart-card-inline chart-card-floating">
+        <div class="chart-summary-card">
+            <div class="chart-summary-kicker">{{ scatterInsight.kicker }}</div>
+            <div class="chart-summary-title">{{ scatterInsight.title }}</div>
+
+            <p
+            v-for="(paragraph, index) in scatterInsight.paragraphs"
+            :key="index"
+            class="chart-summary-text"
+            >
+            {{ paragraph }}
+            </p>
+        </div>
+
+        <div class="chart-card-inline chart-card-floating">
             <StatsChart
-              :mapFeatures="masterData.mapData.features"
-              :selectedIndustry="selectedIndustry"
-              :currentIndustryInfo="currentIndustryInfo"
-              :salaryLookup="salaryLookup"
-              :scoreBenchmark="scoreBenchmark"
-              :brushedZips="brushedZips"
-              :hoveredZip="hoveredZip"
-              @hover="handleHover"
+            :mapFeatures="masterData.mapData.features"
+            :selectedIndustry="selectedIndustry"
+            :currentIndustryInfo="currentIndustryInfo"
+            :salaryLookup="salaryLookup"
+            :scoreBenchmark="scoreBenchmark"
+            :brushedZips="brushedZips"
+            :hoveredZip="hoveredZip"
+            @hover="handleHover"
             />
-          </div>
+        </div>
         </div>
 
         <div class="floating-hover-chip" v-if="hoveredZip">
