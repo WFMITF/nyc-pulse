@@ -184,9 +184,14 @@ function initMap() {
     .domain([0.18, 1.08])
     .interpolator(
       d3.interpolateRgbBasis([
-        '#A9BEBC',
-        '#E6DEE2',
-        '#CF909E'
+        '#3C9BC9',
+        '#65BDBA',
+        '#B0D6A9',
+        '#FEE199',
+        '#FDCD94',
+        '#FAA26F',
+        '#F97F5F',
+        '#FC757B'
       ])
     )
 

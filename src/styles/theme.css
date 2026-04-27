@@ -200,7 +200,15 @@ body {
   width: 100%;
   height: 18px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #CF909E 0%, #E6DEE2 50%, #A9BEBC 100%);
+  background: linear-gradient(90deg,
+  #FC757B 0%,
+  #F97F5F 14%,
+  #FAA26F 28%,
+  #FDCD94 42%,
+  #FEE199 56%,
+  #B0D6A9 70%,
+  #65BDBA 84%,
+  #3C9BC9 100%);
   border: 1px solid rgba(140, 133, 124, 0.16);
   box-shadow: inset 0 1px 2px rgba(90, 80, 72, 0.08);
 }
